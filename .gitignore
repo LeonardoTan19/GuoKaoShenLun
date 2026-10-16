@@ -1,0 +1,9 @@
+# 个人作答记录
+答题记录/
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 脚本临时文件
+.github/.tmp/

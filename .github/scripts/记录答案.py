@@ -47,8 +47,10 @@ VARIANT_ALIASES = {
 }
 
 CN_NUM = "一二三四五六七八九十"
-# 大题标记：一、 二. 之类
+# 大题标记：一、 二. 之类（旧格式）
 BIG_MARK = re.compile(rf"^[{CN_NUM}]+\s*[、.]\s*")
+# 当前题目册的题目头：Typst 三级标题 `=== 题干`
+Q_MARK = re.compile(r"^={3}\s+")
 # 子题标记：(1) / （1） / 1. / 1、 ；允许前置大题标记（如 “三、(1)”）
 SUB_MARK = re.compile(rf"^(?:[{CN_NUM}]+\s*[、.]\s*)?(?:[（(](\d+)[）)]|(\d+)\s*[.、])")
 # 分值： （15分） (满分20分) （10.5分）
@@ -154,6 +156,7 @@ def split_blocks(section: str) -> list[list[str]]:
 
 
 def clean_text(s: str) -> str:
+    s = Q_MARK.sub("", s)
     s = BIG_MARK.sub("", s)
     s = SUB_MARK.sub("", s)
     s = POINTS_RE.sub("", s)
@@ -193,7 +196,7 @@ def parse_questions(typ_path: Path) -> list[dict]:
     # 1) 先按大题标记归组
     groups: list[dict] = []
     for b in blocks:
-        if BIG_MARK.match(b[0]):
+        if BIG_MARK.match(b[0]) or Q_MARK.match(b[0]):
             groups.append({"head": b, "rest": []})
         elif groups:
             groups[-1]["rest"].append(b)

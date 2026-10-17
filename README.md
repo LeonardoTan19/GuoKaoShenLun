@@ -28,6 +28,8 @@ bun install
 bun run dev
 ```
 
+在线版：<https://leonardotan19.github.io/GuoKaoShenLun/>
+
 ## License
 
 [MIT](LICENSE)

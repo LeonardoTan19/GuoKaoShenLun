@@ -1,0 +1,4 @@
+# 国内网络环境：默认走 npmmirror，加速依赖安装
+# 如需官方源，删除本项目 bunfig.toml 或临时使用：bun install --registry https://registry.npmjs.org
+[install]
+registry = "https://registry.npmmirror.com"

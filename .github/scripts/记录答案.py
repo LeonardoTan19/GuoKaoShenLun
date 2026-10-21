@@ -7,6 +7,7 @@
   * 不负责语义解析：年份/卷别/题号/得分/遍数请由调用方（prompt）解析后传入。
 
 用法：
+  python .github/scripts/记录答案.py init                        # 创建并清空答案暂存文件
   python .github/scripts/记录答案.py -p 2016副省 -q 1 -s 12/15 -f .github/.tmp/answer.txt
   python .github/scripts/记录答案.py -p 2016副省 --list          # 只列出该卷题目
   python .github/scripts/记录答案.py -p 2012副省 -q 3 --list     # 定位预览（不改文件）
@@ -60,6 +61,29 @@ POINTS_RE = re.compile(r"[（(]\s*(?:满分\s*)?(\d+(?:\.\d+)?)\s*分\s*[）)]")
 def die(msg: str) -> NoReturn:
     print(msg, file=sys.stderr)
     raise SystemExit(1)
+
+
+# ── 答案暂存文件（init 子命令） ──────────────────────────────────────────
+ANSWER_TMP = Path(".github/.tmp/answer.txt")
+
+
+def init_answer(root: Path) -> Path:
+    """创建或清空答案暂存文件，返回绝对路径；目录缺失时一并创建。"""
+    path = root / ANSWER_TMP
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("", encoding="utf-8", newline="")
+    return path
+
+
+def run_init(argv: list[str]) -> int:
+    ap = argparse.ArgumentParser(prog="记录答案.py init", description="创建并清空答案暂存文件")
+    ap.add_argument("--root", type=Path, default=None, help="工作区根目录")
+    args = ap.parse_args(argv)
+    root = args.root.resolve() if args.root else find_root(Path.cwd().resolve())
+    path = init_answer(root)
+    rel = path.relative_to(root).as_posix() if path.is_relative_to(root) else str(path)
+    print(f"✅ 已就绪：{rel}（已创建，等待写入答案）")
+    return 0
 
 
 # ── 定位：根目录 / typ / 记录文件 ─────────────────────────────────────────
@@ -302,6 +326,10 @@ def find_question_insert_index(lines: list[str], qno: int) -> int | None:
 
 # ── 主流程 ────────────────────────────────────────────────────────────────
 def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] in ("init", "init-answer"):
+        return run_init(argv[1:])
+
     ap = argparse.ArgumentParser(add_help=True, description="申论作答登记（定位固化）")
     ap.add_argument("-p", "--paper", required=True, help="年份+卷别，如 2016副省 / 2022行政执法 / 2005")
     ap.add_argument("-q", "--question", type=int, help="题号（拆分后连续编号）")

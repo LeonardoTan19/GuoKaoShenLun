@@ -1,9 +1,9 @@
 ---
+name: record-answer
 description: "记录一遍申论作答：解析参数后调用脚本定位试卷/题号，原样追加到 答题记录/"
+disable-model-invocation: true
 argument-hint: "例：2016副省 第1题 得分 12/15，然后粘贴你的答案"
-agent: "agent"
 ---
-
 # 任务：登记一遍申论作答
 
 用户会粘贴自己写的申论答案。你的职责是**原样登记**，不改写、不纠错、不点评、不润色。

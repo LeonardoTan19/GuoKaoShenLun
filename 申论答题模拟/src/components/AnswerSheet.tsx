@@ -19,6 +19,10 @@ const MARKER_COLOR = '#f43f5e';
 const MARK_INTERVAL = 100;
 /** 100% 缩放（zoom = 1）时的格子边长 */
 const CELL_SIZE_100 = 33.6;
+/** 卷面左右内边距（对应 px-8）与方格纸左边框的总和 */
+const SHEET_SIDE_EXTRA_PX = 32 * 2 + 1;
+/** A4 纵向纸张在 96dpi 下扣除左右各 10mm 页边距后的可打印宽度（与 index.css 的 @page 一致） */
+const PRINT_CONTENT_WIDTH_PX = Math.floor(((210 - 20) / 25.4) * 96);
 
 /** 离屏 canvas，仅用于量文字自然宽度 */
 let measureCtx: CanvasRenderingContext2D | null | undefined;
@@ -87,6 +91,7 @@ function markLabelStyle(
 
 export function AnswerSheet({ editor, zoom }: Props) {
   const { sheet, caret, selStart, selEnd, composing, focused, config } = editor;
+  const cols = sheet.cols;
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -127,6 +132,13 @@ export function AnswerSheet({ editor, zoom }: Props) {
       alive = false;
     };
   }, [fontStack, fontMain]);
+
+  /** 卷面比纸张宽时，打印前按比例缩小，避免预览被裁切 */
+  useEffect(() => {
+    const sheetWidth = cols * cellSize + SHEET_SIDE_EXTRA_PX;
+    const scale = sheetWidth > PRINT_CONTENT_WIDTH_PX ? PRINT_CONTENT_WIDTH_PX / sheetWidth : 1;
+    document.documentElement.style.setProperty('--print-sheet-scale', scale.toFixed(4));
+  }, [cols, cellSize]);
 
   /** 量出 text 在给定字号下的自然宽度（带缓存） */
   const measureWidth = (text: string, fontPx: number): number => {
@@ -247,7 +259,6 @@ export function AnswerSheet({ editor, zoom }: Props) {
     };
   }, [editor.setSelection]);
 
-  const cols = sheet.cols;
   // 字数刻度所在格（从 1 数起）：每 100 字一个，加上「字数要求」那一格
   const targetWords = resolveTargetWords(config.targetWords);
   const marks = new Set<number>();
@@ -259,12 +270,14 @@ export function AnswerSheet({ editor, zoom }: Props) {
       ref={scrollRef}
       className={[
         'thin-scroll h-full select-none overflow-auto bg-stone-200/70 p-5',
-        config.immersive ? 'pt-12' : '',
+        'print:h-auto print:overflow-visible print:bg-white print:p-0',
+        config.immersive ? 'pt-12 print:pt-0' : '',
       ].join(' ')}
     >
       <div
         ref={wrapRef}
-        className="relative mx-auto w-max bg-white px-8 py-6 shadow-[0_2px_16px_rgba(0,0,0,0.10)] ring-1 ring-stone-300"
+        data-print-sheet
+        className="print-sheet-page relative mx-auto w-max bg-white px-8 py-6 shadow-[0_2px_16px_rgba(0,0,0,0.10)] ring-1 ring-stone-300 print:shadow-none print:ring-0"
         style={{ fontFamily: fontStack }}
       >
         <textarea
@@ -274,7 +287,7 @@ export function AnswerSheet({ editor, zoom }: Props) {
           autoCapitalize="off"
           autoCorrect="off"
           aria-label="申论作答输入区"
-          className="absolute z-30 resize-none overflow-hidden rounded-none border-0 bg-transparent p-0 text-transparent outline-none"
+          className="absolute z-30 resize-none overflow-hidden rounded-none border-0 bg-transparent p-0 text-transparent outline-none print:hidden"
           style={{
             top: 0,
             left: 0,
@@ -294,7 +307,11 @@ export function AnswerSheet({ editor, zoom }: Props) {
         </div>
 
         {sheet.grid.map((row, rIdx) => (
-          <div key={`row-${rIdx}`} className="relative" style={{ marginBottom: rowGap }}>
+          <div
+            key={`row-${rIdx}`}
+            className="relative print:break-inside-avoid"
+            style={{ marginBottom: rowGap }}
+          >
             <div
               className="grid mx-auto w-max"
               style={{
@@ -380,7 +397,7 @@ export function AnswerSheet({ editor, zoom }: Props) {
 
                     {isCaret && (
                       <span
-                        className={`caret-blink pointer-events-none absolute bg-blue-600 ${
+                        className={`caret-blink pointer-events-none absolute bg-blue-600 print:hidden ${
                           focused ? '' : 'caret-idle'
                         }`}
                         style={caretStyle}
@@ -389,7 +406,7 @@ export function AnswerSheet({ editor, zoom }: Props) {
 
                     {isCaret && composing && (
                       <span
-                        className="font-hei pointer-events-none absolute left-0 z-20 whitespace-nowrap rounded border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-xs text-stone-800 shadow-sm"
+                        className="font-hei pointer-events-none absolute left-0 z-20 whitespace-nowrap rounded border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-xs text-stone-800 shadow-sm print:hidden"
                         style={{ top: -Math.round(cellSize * 0.95) }}
                       >
                         {composing}

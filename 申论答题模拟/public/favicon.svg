@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="申论答题模拟">
+  <title>申论答题模拟</title>
+  <g fill="none" stroke="#f43f5e" stroke-width="5" stroke-linejoin="round">
+    <rect x="10" y="10" width="44" height="44" rx="10" />
+    <path d="M32 10v44M10 32h44" />
+  </g>
+</svg>

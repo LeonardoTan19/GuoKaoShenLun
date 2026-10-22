@@ -96,9 +96,9 @@ export function SettingsPanel({ open, config, onConfig, onClose }: Props) {
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-40 bg-stone-900/20" onMouseDown={onClose} />
+      <div className="print:hidden fixed inset-0 z-40 bg-stone-900/20" onMouseDown={onClose} />
 
-      <aside className="settings-drawer fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-stone-200 bg-white shadow-2xl">
+      <aside className="settings-drawer print:hidden fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-stone-200 bg-white shadow-2xl">
         <div className="flex shrink-0 items-center justify-between border-b border-stone-200 px-4 py-3">
           <h2 className="flex items-center gap-1.5 text-sm font-semibold text-stone-800">
             <SettingsIcon className="size-4" strokeWidth={1.75} aria-hidden="true" />

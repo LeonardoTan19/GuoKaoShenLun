@@ -85,6 +85,9 @@ export default function App() {
     notify('已导出文本');
   }, [editor.rawText, notify]);
 
+  /** 打开浏览器打印预览 */
+  const handlePrint = useCallback(() => window.print(), []);
+
   const handleImport = useCallback(
     (file: File) => {
       void file
@@ -105,8 +108,8 @@ export default function App() {
   }, [editor, notify]);
 
   return (
-    <div className="relative flex h-screen flex-col overflow-hidden bg-stone-100">
-      <div ref={headerRef} className={barClass(topVisible, 'top')}>
+    <div className="relative flex h-screen flex-col overflow-hidden bg-stone-100 print:block print:h-auto print:overflow-visible print:bg-white">
+      <div ref={headerRef} className={`print:hidden ${barClass(topVisible, 'top')}`}>
         <Toolbar
           config={editor.config}
           zoom={zoom}
@@ -114,6 +117,7 @@ export default function App() {
           onZoom={setZoom}
           onCopy={handleCopy}
           onExport={handleExport}
+          onPrint={handlePrint}
           onImport={handleImport}
           onClear={handleClear}
           onUndo={editor.undo}
@@ -128,12 +132,12 @@ export default function App() {
         <AnswerSheet editor={editor} zoom={zoom} />
       </main>
 
-      <div ref={footerRef} className={barClass(bottomVisible, 'bottom')}>
+      <div ref={footerRef} className={`print:hidden ${barClass(bottomVisible, 'bottom')}`}>
         <StatusBar editor={editor} />
       </div>
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-stone-800/90 px-4 py-1.5 text-xs text-white shadow-lg">
+        <div className="print:hidden fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-stone-800/90 px-4 py-1.5 text-xs text-white shadow-lg">
           {toast}
         </div>
       )}

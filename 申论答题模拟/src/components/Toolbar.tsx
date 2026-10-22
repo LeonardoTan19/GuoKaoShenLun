@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react';
 import {
   Copy,
   Download,
+  Printer,
   Redo2,
   SlidersHorizontal,
   Trash,
@@ -22,6 +23,7 @@ interface Props {
   onZoom: (zoom: number) => void;
   onCopy: () => void;
   onExport: () => void;
+  onPrint: () => void;
   onImport: (file: File) => void;
   onClear: () => void;
   onUndo: () => void;
@@ -89,6 +91,7 @@ export function Toolbar({
   onZoom,
   onCopy,
   onExport,
+  onPrint,
   onImport,
   onClear,
   onUndo,
@@ -146,6 +149,7 @@ export function Toolbar({
 
           <IconButton icon={Copy} label="复制全文" onClick={onCopy} disabled={!hasText} />
           <IconButton icon={Download} label="导出 .txt" onClick={onExport} disabled={!hasText} />
+          <IconButton icon={Printer} label="导出 PDF" shortcut="Ctrl + P" onClick={onPrint} />
           <IconButton icon={Upload} label="导入文本" onClick={() => fileRef.current?.click()} />
           <IconButton icon={Trash} label="清空卷面" onClick={onClear} danger />
           <input

@@ -91,3 +91,31 @@ body {
   background: #a8a29e;
   background-clip: content-box;
 }
+
+/* 打印 / 导出 PDF */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  html,
+  body,
+  #root {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  /* 卷面比纸张更宽时按比例缩小到 A4 幅面内（缩放比由 AnswerSheet 计算） */
+  .print-sheet-page {
+    zoom: var(--print-sheet-scale, 1);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* 选区 / 悬停底色不参与打印 */
+  .print-sheet-page [data-cell] {
+    background-color: transparent !important;
+  }
+}

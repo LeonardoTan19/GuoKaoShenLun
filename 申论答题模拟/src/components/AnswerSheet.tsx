@@ -41,7 +41,12 @@ function fitStyle(fit: { fontSize: number; scaleX: number } | null): CSSProperti
 }
 
 /** 字数刻度：格下方居中、尖朝上的小三角 */
-function triangleStyle(cellSize: number, rowGap: number, big: boolean): CSSProperties {
+function triangleStyle(
+  cellSize: number,
+  rowGap: number,
+  big: boolean,
+  color: string,
+): CSSProperties {
   const w = Math.round(cellSize * 0.1 * (big ? 1.5 : 1));
   const h = Math.round(cellSize * 0.16 * (big ? 1.5 : 1));
   return {
@@ -54,12 +59,17 @@ function triangleStyle(cellSize: number, rowGap: number, big: boolean): CSSPrope
     height: 0,
     borderLeft: `${w}px solid transparent`,
     borderRight: `${w}px solid transparent`,
-    borderBottom: `${h}px solid ${MARKER_COLOR}`,
+    borderBottom: `${h}px solid ${color}`,
   };
 }
 
 /** 每 100 字的文字提示：紧贴三角右侧 */
-function markLabelStyle(cellSize: number, rowGap: number, big: boolean): CSSProperties {
+function markLabelStyle(
+  cellSize: number,
+  rowGap: number,
+  big: boolean,
+  color: string,
+): CSSProperties {
   const w = Math.round(cellSize * 0.1 * (big ? 1.5 : 1));
   return {
     position: 'absolute',
@@ -70,7 +80,7 @@ function markLabelStyle(cellSize: number, rowGap: number, big: boolean): CSSProp
     transform: 'translateY(-50%)',
     fontSize: Math.max(8, Math.round(rowGap * 0.7)),
     lineHeight: 1,
-    color: MARKER_COLOR,
+    color,
     whiteSpace: 'nowrap',
   };
 }
@@ -151,13 +161,11 @@ export function AnswerSheet({ editor, zoom }: Props) {
     borderRight: `1px solid ${lineColor}`,
   };
 
-  const gridBox: CSSProperties = config.showGrid
-    ? {
-        borderTop: `1px solid ${lineColor}`,
-        borderLeft: `1px solid ${lineColor}`,
-        borderBottom: `1px solid ${lineColor}`,
-      }
-    : {};
+  const gridBox: CSSProperties = {
+    borderTop: `1px solid ${lineColor}`,
+    borderLeft: `1px solid ${lineColor}`,
+    borderBottom: `1px solid ${lineColor}`,
+  };
 
   useLayoutEffect(() => {
     const ta = editor.textareaRef.current;
@@ -381,7 +389,7 @@ export function AnswerSheet({ editor, zoom }: Props) {
 
                     {isCaret && composing && (
                       <span
-                        className="pointer-events-none absolute left-0 z-20 whitespace-nowrap rounded border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-xs text-stone-800 shadow-sm"
+                        className="font-hei pointer-events-none absolute left-0 z-20 whitespace-nowrap rounded border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-xs text-stone-800 shadow-sm"
                         style={{ top: -Math.round(cellSize * 0.95) }}
                       >
                         {composing}
@@ -392,12 +400,12 @@ export function AnswerSheet({ editor, zoom }: Props) {
                       <>
                         <span
                           className="pointer-events-none"
-                          style={triangleStyle(cellSize, rowGap, isTarget)}
+                          style={triangleStyle(cellSize, rowGap, isTarget, lineColor)}
                         />
                         {isCentury && (
                           <span
                             className="font-hei pointer-events-none"
-                            style={markLabelStyle(cellSize, rowGap, isTarget)}
+                            style={markLabelStyle(cellSize, rowGap, isTarget, lineColor)}
                           >
                             {index}字
                           </span>

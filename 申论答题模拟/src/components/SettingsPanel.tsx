@@ -1,7 +1,17 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { FONT_OPTIONS } from '../core/presets';
+import { LayoutGrid, Monitor, Ruler, Settings as SettingsIcon, Type, X } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { FONT_OPTIONS, resolveColsPerRow, resolveTargetWords } from '../core/presets';
 import type { FontKey, StyleConfig } from '../core/types';
+
+const toCount = (value: string) => Math.max(0, Math.floor(Number(value) || 0));
+
+const INPUT =
+  'h-5 w-16 rounded border border-stone-300 px-1.5 text-xs placeholder:text-stone-300 focus:border-rose-400 focus:outline-none';
+
+const ROW =
+  'flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-xs leading-5 text-stone-700 hover:bg-stone-100';
 
 type FlagKey = Exclude<keyof StyleConfig, 'colsPerRow' | 'targetWords' | 'font' | 'immersive'>;
 
@@ -14,8 +24,25 @@ const FLAGS: { key: FlagKey; label: string; title?: string }[] = [
   { key: 'avoidLineStartPunct', label: '标点避头', title: '行首禁排标点挤压到上一行最后一格' },
   { key: 'keepWidePairs', label: '破折号占两格', title: '—— / …… 占两格且不拆行' },
   { key: 'centerTitle', label: '第一行为标题', title: '首行作为标题自动居中' },
-  { key: 'showGrid', label: '显示格线' },
 ];
+
+function SectionTitle({
+  icon: Icon,
+  title,
+  aside,
+}: {
+  icon: LucideIcon;
+  title: string;
+  aside?: string;
+}) {
+  return (
+    <h3 className="mb-1 flex items-center gap-1.5 px-2 text-[11px] font-medium tracking-wide text-stone-500">
+      <Icon className="size-3.5" strokeWidth={1.75} aria-hidden="true" />
+      {title}
+      {aside && <span className="tabular-nums text-stone-400">{aside}</span>}
+    </h3>
+  );
+}
 
 function Switch({
   label,
@@ -29,10 +56,7 @@ function Switch({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <label
-      title={title}
-      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs text-stone-700 hover:bg-stone-100"
-    >
+    <label title={title} className={ROW}>
       <input
         type="checkbox"
         checked={checked}
@@ -67,6 +91,8 @@ export function SettingsPanel({ open, config, onConfig, onClose }: Props) {
   const font: FontKey = FONT_OPTIONS.some((o) => o.key === config.font)
     ? config.font
     : FONT_OPTIONS[0].key;
+  const cols = resolveColsPerRow(config.colsPerRow);
+  const rows = Math.ceil(resolveTargetWords(config.targetWords) / cols) || 1;
 
   return createPortal(
     <>
@@ -74,25 +100,69 @@ export function SettingsPanel({ open, config, onConfig, onClose }: Props) {
 
       <aside className="settings-drawer fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-stone-200 bg-white shadow-2xl">
         <div className="flex shrink-0 items-center justify-between border-b border-stone-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-stone-800">设置</h2>
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold text-stone-800">
+            <SettingsIcon className="size-4" strokeWidth={1.75} aria-hidden="true" />
+            设置
+          </h2>
           <button
             type="button"
             onClick={onClose}
+            title="关闭设置"
             aria-label="关闭设置"
-            className="rounded-md px-2 py-0.5 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"
+            className="inline-flex size-6 items-center justify-center rounded-md text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"
           >
-            ✕
+            <X className="size-4" strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
 
         <div className="thin-scroll min-h-0 flex-1 overflow-y-auto px-3 py-4">
           <section>
-            <h3 className="mb-1 flex items-center gap-1.5 px-2 text-[11px] font-medium tracking-wide text-stone-500">
-              排版规则
-              <span className="tabular-nums text-stone-400">
-                {activeFlags}/{FLAGS.length}
-              </span>
-            </h3>
+            <SectionTitle icon={Ruler} title="卷面" />
+            <div className="grid gap-0.5">
+              <label className={ROW} title="留空按 25 格计算">
+                <span className="w-16 shrink-0">每行</span>
+                <input
+                  type="number"
+                  min={10}
+                  max={40}
+                  value={config.colsPerRow || ''}
+                  placeholder="25"
+                  onChange={(e) => onConfig((c) => ({ ...c, colsPerRow: toCount(e.target.value) }))}
+                  className={INPUT}
+                />
+                <span className="text-stone-500">格</span>
+              </label>
+
+              <label className={ROW} title="留空按 300 字计算">
+                <span className="w-16 shrink-0">字数要求</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={2000}
+                  step={50}
+                  value={config.targetWords || ''}
+                  placeholder="300"
+                  onChange={(e) => onConfig((c) => ({ ...c, targetWords: toCount(e.target.value) }))}
+                  className={INPUT}
+                />
+                <span className="text-stone-500">字</span>
+                <span className="ml-auto text-stone-400">≈ {rows} 行</span>
+              </label>
+
+              <Switch
+                label="显示格线"
+                checked={config.showGrid}
+                onChange={(v) => onConfig((c) => ({ ...c, showGrid: v }))}
+              />
+            </div>
+          </section>
+
+          <section className="mt-5 border-t border-stone-200 pt-4">
+            <SectionTitle
+              icon={LayoutGrid}
+              title="排版规则"
+              aside={`${activeFlags}/${FLAGS.length}`}
+            />
             <div className="grid gap-0.5">
               {FLAGS.map(({ key, label, title }) => (
                 <Switch
@@ -107,9 +177,7 @@ export function SettingsPanel({ open, config, onConfig, onClose }: Props) {
           </section>
 
           <section className="mt-5 border-t border-stone-200 pt-4">
-            <h3 className="mb-1 px-2 text-[11px] font-medium tracking-wide text-stone-500">
-              答案字体
-            </h3>
+            <SectionTitle icon={Type} title="答案字体" />
             <div className="grid gap-0.5">
               {FONT_OPTIONS.map((option) => {
                 const checked = option.key === font;
@@ -142,7 +210,7 @@ export function SettingsPanel({ open, config, onConfig, onClose }: Props) {
           </section>
 
           <section className="mt-5 border-t border-stone-200 pt-4">
-            <h3 className="mb-1 px-2 text-[11px] font-medium tracking-wide text-stone-500">界面</h3>
+            <SectionTitle icon={Monitor} title="界面" />
             <div className="grid gap-0.5">
               <Switch
                 label="沉浸式答题"

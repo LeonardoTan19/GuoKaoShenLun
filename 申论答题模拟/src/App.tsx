@@ -15,7 +15,7 @@ function loadSaved(): { text: string; config: StyleConfig } | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { text?: unknown; config?: Partial<StyleConfig> };
     if (typeof parsed.text !== 'string') return null;
-    return { text: parsed.text, config: { ...DEFAULT_CONFIG, ...(parsed.config ?? {}) } };
+    return { text: parsed.text.replace(/\r\n?/g, '\n'), config: { ...DEFAULT_CONFIG, ...(parsed.config ?? {}) } };
   } catch {
     return null;
   }
@@ -79,7 +79,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `申论作答_${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = `申论作答_${new Date().toLocaleDateString('sv-SE')}.txt`;
     a.click();
     URL.revokeObjectURL(url);
     notify('已导出文本');

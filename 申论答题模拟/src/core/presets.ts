@@ -83,8 +83,7 @@ export function resolveColsPerRow(value: number): number {
   return resolvePositive(value, 25);
 }
 
-/** 解析生效的字数要求：输入框留空（0）时按 200 算 */
 export function resolveTargetWords(value: number): number {
-  return resolvePositive(value, 200);
+  return resolvePositive(value, 300);
 }
 

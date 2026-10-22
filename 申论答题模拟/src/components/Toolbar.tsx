@@ -148,7 +148,7 @@ export function Toolbar({
 
           <label
             className="flex items-center gap-1.5 text-xs text-stone-600"
-            title="留空按 200 字计算"
+            title="留空按 300 字计算"
           >
             字数要求
             <input
@@ -157,7 +157,7 @@ export function Toolbar({
               max={2000}
               step={50}
               value={config.targetWords || ''}
-              placeholder="200"
+              placeholder="300"
               onChange={(e) => onConfig((c) => ({ ...c, targetWords: toCount(e.target.value) }))}
               className="w-16 rounded border border-stone-300 px-1.5 py-0.5 text-xs placeholder:text-stone-300 focus:border-rose-400 focus:outline-none"
             />

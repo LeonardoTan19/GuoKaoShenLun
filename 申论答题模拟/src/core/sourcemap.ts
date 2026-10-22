@@ -145,11 +145,17 @@ export function buildSheet(rawText: string, config: StyleConfig): Sheet {
         FORBIDDEN_LINE_START_RE.test(t.text)
       ) {
         const prevRow = draftRows[draftRows.length - 1];
-        const last = prevRow[prevRow.length - 1];
-        if (last) {
-          last.extraPunct = (last.extraPunct ?? '') + t.text;
-          last.extraPunctRange = [t.rawStart, t.rawEnd];
-          last.rawEnd = Math.max(last.rawEnd, t.rawEnd);
+        let lastReal: Draft | undefined;
+        for (let k = prevRow.length - 1; k >= 0; k--) {
+          if (prevRow[k].rawEnd > prevRow[k].rawStart) {
+            lastReal = prevRow[k];
+            break;
+          }
+        }
+        if (lastReal) {
+          lastReal.extraPunct = (lastReal.extraPunct ?? '') + t.text;
+          lastReal.extraPunctRange = [t.rawStart, t.rawEnd];
+          lastReal.rawEnd = Math.max(lastReal.rawEnd, t.rawEnd);
           continue;
         }
       }

@@ -105,6 +105,19 @@ export function AnswerSheet({ editor, zoom }: Props) {
     };
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+    if (!document.fonts?.load) return;
+    void document.fonts.load(`${fontMain}px ${fontStack}`).then(() => {
+      if (!alive) return;
+      measureCache.current.clear();
+      setFontEpoch((n) => n + 1);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [fontStack, fontMain]);
+
   /** 量出 text 在给定字号下的自然宽度（带缓存） */
   const measureWidth = (text: string, fontPx: number): number => {
     const key = `${fontStack}\u0000${fontEpoch}\u0000${fontPx}\u0000${text}`;
@@ -224,7 +237,7 @@ export function AnswerSheet({ editor, zoom }: Props) {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
-  }, [editor]);
+  }, [editor.setSelection]);
 
   const cols = sheet.cols;
   // 字数刻度所在格（从 1 数起）：每 100 字一个，加上「字数要求」那一格

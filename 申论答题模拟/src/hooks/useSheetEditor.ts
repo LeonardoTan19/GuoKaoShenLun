@@ -24,6 +24,14 @@ interface Snapshot {
 const HISTORY_LIMIT = 400;
 const COALESCE_MS = 400;
 
+function getAF(ta: HTMLTextAreaElement): { anchor: number; focus: number } {
+  const backward = ta.selectionDirection === 'backward';
+  return {
+    anchor: backward ? ta.selectionEnd : ta.selectionStart,
+    focus: backward ? ta.selectionStart : ta.selectionEnd,
+  };
+}
+
 export function useSheetEditor(initialText: string, initialConfig: StyleConfig) {
   const [rawText, setRawText] = useState(initialText);
   const [config, setConfigState] = useState(initialConfig);
@@ -33,13 +41,12 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
   }));
   const [composing, setComposing] = useState('');
   const [focused, setFocused] = useState(false);
-  const [, setHistoryVersion] = useState(0);
+  const [histState, setHistState] = useState({ canUndo: false, canRedo: false });
 
   const textareaRef: RefObject<HTMLTextAreaElement | null> = useRef(null);
   const composingRef = useRef(false);
   const skipNextInputRef = useRef(false);
   const textRef = useRef(rawText);
-  const selRef = useRef(selection);
   const past = useRef<Snapshot[]>([]);
   const future = useRef<Snapshot[]>([]);
   const lastPushAt = useRef(0);
@@ -47,9 +54,6 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
   useEffect(() => {
     textRef.current = rawText;
   }, [rawText]);
-  useEffect(() => {
-    selRef.current = selection;
-  }, [selection]);
 
   const sheet = useMemo(() => buildSheet(rawText, config), [rawText, config]);
   const units = useMemo(() => buildUnits(sheet.flat), [sheet]);
@@ -58,22 +62,29 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
     [sheet, selection.focus],
   );
 
+  const syncHistState = useCallback(() => {
+    setHistState({ canUndo: past.current.length > 0, canRedo: future.current.length > 0 });
+  }, []);
+
+  const snapFromTA = useCallback((): Snapshot => {
+    const ta = textareaRef.current;
+    const { anchor, focus } = ta ? getAF(ta) : { anchor: 0, focus: 0 };
+    return { text: textRef.current, anchor, focus };
+  }, []);
+
   const pushHistory = useCallback((coalesce: boolean) => {
     const now = Date.now();
     if (coalesce && now - lastPushAt.current < COALESCE_MS && past.current.length > 0) {
-      lastPushAt.current = now;
+      future.current = [];
+      syncHistState();
       return;
     }
-    past.current.push({
-      text: textRef.current,
-      anchor: selRef.current.anchor,
-      focus: selRef.current.focus,
-    });
+    past.current.push(snapFromTA());
     if (past.current.length > HISTORY_LIMIT) past.current.shift();
     future.current = [];
     lastPushAt.current = now;
-    setHistoryVersion((v) => v + 1);
-  }, []);
+    syncHistState();
+  }, [snapFromTA, syncHistState]);
 
   const applySnapshot = useCallback((snap: Snapshot) => {
     const ta = textareaRef.current;
@@ -107,7 +118,7 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
     const ta = textareaRef.current;
     if (ta) {
       if (document.activeElement !== ta) ta.focus();
-      ta.setSelectionRange(a, f);
+      ta.setSelectionRange(Math.min(a, f), Math.max(a, f), a <= f ? 'forward' : 'backward');
     }
     setSelectionState({ anchor: a, focus: f });
   }, []);
@@ -127,26 +138,20 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
   const undo = useCallback(() => {
     const snap = past.current.pop();
     if (!snap) return;
-    future.current.push({
-      text: textRef.current,
-      anchor: selRef.current.anchor,
-      focus: selRef.current.focus,
-    });
-    setHistoryVersion((v) => v + 1);
+    future.current.push(snapFromTA());
+    lastPushAt.current = 0;
+    syncHistState();
     applySnapshot(snap);
-  }, [applySnapshot]);
+  }, [applySnapshot, snapFromTA, syncHistState]);
 
   const redo = useCallback(() => {
     const snap = future.current.pop();
     if (!snap) return;
-    past.current.push({
-      text: textRef.current,
-      anchor: selRef.current.anchor,
-      focus: selRef.current.focus,
-    });
-    setHistoryVersion((v) => v + 1);
+    past.current.push(snapFromTA());
+    lastPushAt.current = 0;
+    syncHistState();
     applySnapshot(snap);
-  }, [applySnapshot]);
+  }, [applySnapshot, snapFromTA, syncHistState]);
 
   const moveVertical = useCallback(
     (dir: number, extend: boolean) => {
@@ -174,8 +179,9 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
         offset = row[idx].rawEnd;
       }
 
-      const anchor = selRef.current.anchor;
-      setSelection(extend ? anchor : offset, offset);
+      const ta = textareaRef.current;
+      const anchor = extend && ta ? getAF(ta).anchor : offset;
+      setSelection(anchor, offset);
     },
     [caret, setSelection, sheet.grid],
   );
@@ -186,8 +192,9 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
       if (!row) return;
       const b = rowBounds(row);
       const offset = side === 'start' ? b.start : b.end;
-      const anchor = selRef.current.anchor;
-      setSelection(extend ? anchor : offset, offset);
+      const ta = textareaRef.current;
+      const anchor = extend && ta ? getAF(ta).anchor : offset;
+      setSelection(anchor, offset);
     },
     [caret.row, setSelection, sheet.grid],
   );
@@ -195,7 +202,9 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
   const pickOffset = useCallback(
     (offset: number, extend: boolean) => {
       if (extend) {
-        setSelection(selRef.current.anchor, offset);
+        const ta = textareaRef.current;
+        const anchor = ta ? getAF(ta).anchor : offset;
+        setSelection(anchor, offset);
         return;
       }
       setSelection(offset, offset);
@@ -240,8 +249,8 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
         case 'ArrowLeft': {
           e.preventDefault();
           if (extend) {
-            const { anchor, focus } = selRef.current;
-            setSelection(anchor, focus > anchor ? anchor : prevStop(units, focus));
+            const { anchor, focus } = getAF(ta);
+            setSelection(anchor, prevStop(units, focus));
           } else {
             const t = s !== en ? s : prevStop(units, s);
             setSelection(t, t);
@@ -251,8 +260,8 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
         case 'ArrowRight': {
           e.preventDefault();
           if (extend) {
-            const { anchor, focus } = selRef.current;
-            setSelection(anchor, focus < anchor ? anchor : nextStop(units, focus, len));
+            const { anchor, focus } = getAF(ta);
+            setSelection(anchor, nextStop(units, focus, len));
           } else {
             const t = s !== en ? en : nextStop(units, s, len);
             setSelection(t, t);
@@ -310,6 +319,7 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
       if (composingRef.current) return;
       if (skipNextInputRef.current) {
         skipNextInputRef.current = false;
+        if (ta.value === textRef.current) return;
         setRawText(ta.value);
         setSelectionState({ anchor: ta.selectionStart, focus: ta.selectionEnd });
         return;
@@ -323,9 +333,8 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
 
   const handleSelect = useCallback(() => {
     const ta = textareaRef.current;
-    if (!ta) return;
-    if (composingRef.current) return;
-    setSelectionState({ anchor: ta.selectionStart, focus: ta.selectionEnd });
+    if (!ta || composingRef.current) return;
+    setSelectionState(getAF(ta));
   }, []);
 
   const handleCompositionStart = useCallback(() => {
@@ -360,8 +369,8 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
     selEnd,
     composing,
     focused,
-    canUndo: past.current.length > 0,
-    canRedo: future.current.length > 0,
+    canUndo: histState.canUndo,
+    canRedo: histState.canRedo,
     textareaRef,
     loadText,
     setSelection,

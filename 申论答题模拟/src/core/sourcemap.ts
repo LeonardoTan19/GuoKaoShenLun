@@ -10,7 +10,7 @@ const WIDE_PAIR_RE = /^(——|――|……|\.\.\.\.)/;
 /** 相邻双标点合占一格：冒号 + 开引号、句末标点 + 闭引号 */
 const PUNCT_PAIR_RE = /^(：['“‘「『]|[。！？]['”’」』])/;
 /** 禁止出现在行首的标点（避头） */
-const FORBIDDEN_LINE_START_RE = /^[，。、；：？！）〕】》」”’…—％%]/;
+const FORBIDDEN_LINE_START_RE = /^[，。、；：？！）〕】》」”’％%]/;
 
 /** 「源码多字符挤进一格」的合并规则，按优先级排列 */
 const MERGE_RULES: { flag: keyof StyleConfig; re: RegExp; type: CellType }[] = [
@@ -137,11 +137,13 @@ export function buildSheet(rawText: string, config: StyleConfig): Sheet {
       }
     }
 
+    let wideOpen = false;
     for (const t of tokens) {
       if (
         config.avoidLineStartPunct &&
         row.length === 0 &&
         draftRows.length > 0 &&
+        t.type !== 'wide' &&
         FORBIDDEN_LINE_START_RE.test(t.text)
       ) {
         const prevRow = draftRows[draftRows.length - 1];
@@ -160,8 +162,13 @@ export function buildSheet(rawText: string, config: StyleConfig): Sheet {
         }
       }
 
-      if (t.type === 'wide' && row.length === cols - 1) {
-        push(blank(t.rawStart, 'filler'));
+      if (t.type === 'wide') {
+        if (!wideOpen) {
+          wideOpen = true;
+          if (cols >= 2 && row.length >= cols - 1) push(blank(t.rawStart, 'filler'));
+        } else {
+          wideOpen = false;
+        }
       }
 
       push(t);

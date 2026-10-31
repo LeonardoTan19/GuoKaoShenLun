@@ -1,8 +1,14 @@
 /**
  * 方格原位输入：真实数据只是一个纯字符串 + 选区偏移量，页面只挂一个跟随光标的透明 textarea
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CompositionEvent, FormEvent, KeyboardEvent, RefObject } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type {
+  ClipboardEvent,
+  CompositionEvent,
+  FormEvent,
+  KeyboardEvent,
+  RefObject,
+} from "react";
 import {
   buildUnits,
   findCaretVisualPosition,
@@ -10,10 +16,10 @@ import {
   nextStop,
   prevStop,
   rowBounds,
-} from '../core/navigate';
-import { clamp } from '../core/presets';
-import { buildSheet } from '../core/sourcemap';
-import type { Selection, StyleConfig } from '../core/types';
+} from "../core/navigate";
+import { clamp } from "../core/presets";
+import { buildSheet } from "../core/sourcemap";
+import type { CaretVisualPos, Selection, StyleConfig } from "../core/types";
 
 interface Snapshot {
   text: string;
@@ -24,36 +30,64 @@ interface Snapshot {
 const HISTORY_LIMIT = 400;
 const COALESCE_MS = 400;
 
-function getAF(ta: HTMLTextAreaElement): { anchor: number; focus: number } {
-  const backward = ta.selectionDirection === 'backward';
-  return {
-    anchor: backward ? ta.selectionEnd : ta.selectionStart,
-    focus: backward ? ta.selectionStart : ta.selectionEnd,
-  };
-}
-
-export function useSheetEditor(initialText: string, initialConfig: StyleConfig) {
+export function useSheetEditor(
+  initialText: string,
+  initialConfig: StyleConfig,
+) {
   const [rawText, setRawText] = useState(initialText);
   const [config, setConfigState] = useState(initialConfig);
   const [selection, setSelectionState] = useState<Selection>(() => ({
     anchor: initialText.length,
     focus: initialText.length,
   }));
-  const [composing, setComposing] = useState('');
+  const [composing, setComposing] = useState("");
   const [focused, setFocused] = useState(false);
-  const [histState, setHistState] = useState({ canUndo: false, canRedo: false });
+  const [histState, setHistState] = useState({
+    canUndo: false,
+    canRedo: false,
+  });
 
   const textareaRef: RefObject<HTMLTextAreaElement | null> = useRef(null);
   const composingRef = useRef(false);
-  const skipNextInputRef = useRef(false);
   const textRef = useRef(rawText);
+  const selRef = useRef<Selection>({
+    anchor: initialText.length,
+    focus: initialText.length,
+  });
   const past = useRef<Snapshot[]>([]);
   const future = useRef<Snapshot[]>([]);
   const lastPushAt = useRef(0);
 
-  useEffect(() => {
-    textRef.current = rawText;
-  }, [rawText]);
+  const writeNative = useCallback((text: string, sel: Selection) => {
+    const ta = textareaRef.current;
+    if (!ta || composingRef.current) return;
+    const tail = text.slice(Math.max(sel.anchor, sel.focus));
+    if (ta.value !== tail) ta.value = tail;
+    ta.setSelectionRange(0, 0);
+  }, []);
+
+  const apply = useCallback(
+    (text: string, anchor: number, focus: number) => {
+      const len = text.length;
+      const sel: Selection = {
+        anchor: clamp(anchor, 0, len),
+        focus: clamp(focus, 0, len),
+      };
+      textRef.current = text;
+      selRef.current = sel;
+      setRawText(text);
+      setSelectionState(sel);
+      const ta = textareaRef.current;
+      if (!ta) return;
+      if (document.activeElement !== ta) ta.focus();
+      writeNative(text, sel);
+    },
+    [writeNative],
+  );
+
+  useLayoutEffect(() => {
+    writeNative(rawText, selRef.current);
+  }, [rawText, selection, writeNative]);
 
   const sheet = useMemo(() => buildSheet(rawText, config), [rawText, config]);
   const units = useMemo(() => buildUnits(sheet.flat), [sheet]);
@@ -61,67 +95,65 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
     () => findCaretVisualPosition(sheet.grid, selection.focus),
     [sheet, selection.focus],
   );
+  const composingCaret = useMemo<CaretVisualPos | null>(() => {
+    const next =
+      composing && caret.placement === "right"
+        ? sheet.grid[caret.row]?.[caret.col + 1]
+        : null;
+    return next
+      ? { ...caret, col: caret.col + 1, placement: "left", cellId: next.id }
+      : null;
+  }, [caret, composing, sheet.grid]);
 
   const syncHistState = useCallback(() => {
-    setHistState({ canUndo: past.current.length > 0, canRedo: future.current.length > 0 });
-  }, []);
-
-  const snapFromTA = useCallback((): Snapshot => {
-    const ta = textareaRef.current;
-    const { anchor, focus } = ta ? getAF(ta) : { anchor: 0, focus: 0 };
-    return { text: textRef.current, anchor, focus };
-  }, []);
-
-  const pushHistory = useCallback((coalesce: boolean) => {
-    const now = Date.now();
-    if (coalesce && now - lastPushAt.current < COALESCE_MS && past.current.length > 0) {
-      future.current = [];
-      syncHistState();
-      return;
-    }
-    past.current.push(snapFromTA());
-    if (past.current.length > HISTORY_LIMIT) past.current.shift();
-    future.current = [];
-    lastPushAt.current = now;
-    syncHistState();
-  }, [snapFromTA, syncHistState]);
-
-  const applySnapshot = useCallback((snap: Snapshot) => {
-    const ta = textareaRef.current;
-    if (ta) ta.value = snap.text;
-    setRawText(snap.text);
-    setSelectionState({ anchor: snap.anchor, focus: snap.focus });
-    requestAnimationFrame(() => {
-      const el = textareaRef.current;
-      if (!el) return;
-      if (document.activeElement !== el) el.focus();
-      el.setSelectionRange(snap.anchor, snap.focus);
+    setHistState({
+      canUndo: past.current.length > 0,
+      canRedo: future.current.length > 0,
     });
   }, []);
+
+  const snapshot = useCallback(
+    (): Snapshot => ({ text: textRef.current, ...selRef.current }),
+    [],
+  );
+
+  const pushHistory = useCallback(
+    (coalesce: boolean) => {
+      const now = Date.now();
+      const merge =
+        coalesce &&
+        now - lastPushAt.current < COALESCE_MS &&
+        past.current.length > 0;
+      future.current = [];
+      if (!merge) {
+        past.current.push(snapshot());
+        if (past.current.length > HISTORY_LIMIT) past.current.shift();
+        lastPushAt.current = now;
+      }
+      syncHistState();
+    },
+    [snapshot, syncHistState],
+  );
 
   const commit = useCallback(
     (text: string, anchor: number, focus: number, coalesce = false) => {
       pushHistory(coalesce);
-      applySnapshot({
-        text,
-        anchor: clamp(anchor, 0, text.length),
-        focus: clamp(focus, 0, text.length),
-      });
+      apply(text, anchor, focus);
     },
-    [applySnapshot, pushHistory],
+    [apply, pushHistory],
   );
 
-  const setSelection = useCallback((anchor: number, focus: number) => {
-    const len = textRef.current.length;
-    const a = clamp(anchor, 0, len);
-    const f = clamp(focus, 0, len);
-    const ta = textareaRef.current;
-    if (ta) {
-      if (document.activeElement !== ta) ta.focus();
-      ta.setSelectionRange(Math.min(a, f), Math.max(a, f), a <= f ? 'forward' : 'backward');
-    }
-    setSelectionState({ anchor: a, focus: f });
-  }, []);
+  const setSelection = useCallback(
+    (anchor: number, focus: number) => apply(textRef.current, anchor, focus),
+    [apply],
+  );
+
+  const moveTo = useCallback(
+    (offset: number, extend: boolean) => {
+      setSelection(extend ? selRef.current.anchor : offset, offset);
+    },
+    [setSelection],
+  );
 
   const setConfig = useCallback((updater: (c: StyleConfig) => StyleConfig) => {
     setConfigState((c) => updater(c));
@@ -129,29 +161,25 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
 
   /** 载入新全文 */
   const loadText = useCallback(
-    (text: string) => {
-      commit(text, text.length, text.length);
-    },
+    (text: string) => commit(text, text.length, text.length),
     [commit],
   );
 
-  const undo = useCallback(() => {
-    const snap = past.current.pop();
-    if (!snap) return;
-    future.current.push(snapFromTA());
-    lastPushAt.current = 0;
-    syncHistState();
-    applySnapshot(snap);
-  }, [applySnapshot, snapFromTA, syncHistState]);
+  const travel = useCallback(
+    (from: RefObject<Snapshot[]>, to: RefObject<Snapshot[]>) => {
+      const snap = from.current.pop();
+      if (!snap) return;
+      to.current.push(snapshot());
+      lastPushAt.current = 0;
+      syncHistState();
+      apply(snap.text, snap.anchor, snap.focus);
+    },
+    [apply, snapshot, syncHistState],
+  );
 
-  const redo = useCallback(() => {
-    const snap = future.current.pop();
-    if (!snap) return;
-    past.current.push(snapFromTA());
-    lastPushAt.current = 0;
-    syncHistState();
-    applySnapshot(snap);
-  }, [applySnapshot, snapFromTA, syncHistState]);
+  const undo = useCallback(() => travel(past, future), [travel]);
+
+  const redo = useCallback(() => travel(future, past), [travel]);
 
   const moveVertical = useCallback(
     (dir: number, extend: boolean) => {
@@ -174,117 +202,91 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
         const gap = row.find((c) => GAP_TYPES.has(c.type));
         offset = gap ? gap.rawStart : row[0].rawStart;
       } else if (idx === caret.col) {
-        offset = caret.placement === 'right' ? row[idx].rawEnd : row[idx].rawStart;
+        offset =
+          caret.placement === "right" ? row[idx].rawEnd : row[idx].rawStart;
       } else {
         offset = row[idx].rawEnd;
       }
 
-      const ta = textareaRef.current;
-      const anchor = extend && ta ? getAF(ta).anchor : offset;
-      setSelection(anchor, offset);
+      moveTo(offset, extend);
     },
-    [caret, setSelection, sheet.grid],
+    [caret, moveTo, sheet.grid],
   );
 
   const goRowEdge = useCallback(
-    (side: 'start' | 'end', extend: boolean) => {
+    (side: "start" | "end", extend: boolean) => {
       const row = sheet.grid[caret.row];
       if (!row) return;
       const b = rowBounds(row);
-      const offset = side === 'start' ? b.start : b.end;
-      const ta = textareaRef.current;
-      const anchor = extend && ta ? getAF(ta).anchor : offset;
-      setSelection(anchor, offset);
+      moveTo(side === "start" ? b.start : b.end, extend);
     },
-    [caret.row, setSelection, sheet.grid],
-  );
-
-  const pickOffset = useCallback(
-    (offset: number, extend: boolean) => {
-      if (extend) {
-        const ta = textareaRef.current;
-        const anchor = ta ? getAF(ta).anchor : offset;
-        setSelection(anchor, offset);
-        return;
-      }
-      setSelection(offset, offset);
-    },
-    [setSelection],
+    [caret.row, moveTo, sheet.grid],
   );
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (composingRef.current || e.nativeEvent.isComposing) return;
 
-      const ta = e.currentTarget;
-      const s = Math.min(ta.selectionStart, ta.selectionEnd);
-      const en = Math.max(ta.selectionStart, ta.selectionEnd);
-      const len = textRef.current.length;
+      const { anchor, focus } = selRef.current;
+      const s = Math.min(anchor, focus);
+      const en = Math.max(anchor, focus);
       const text = textRef.current;
+      const len = text.length;
       const mod = e.ctrlKey || e.metaKey;
       const extend = e.shiftKey;
 
       if (mod && !e.altKey) {
         const k = e.key.toLowerCase();
-        if (k === 'a') {
+        if (k === "a") {
           e.preventDefault();
           setSelection(0, len);
           return;
         }
-        if (k === 'z') {
+        if (k === "z") {
           e.preventDefault();
           if (extend) redo();
           else undo();
           return;
         }
-        if (k === 'y') {
+        if (k === "y") {
           e.preventDefault();
           redo();
           return;
         }
+        writeNative(text, selRef.current);
         return;
       }
 
       switch (e.key) {
-        case 'ArrowLeft': {
+        case "ArrowLeft": {
           e.preventDefault();
-          if (extend) {
-            const { anchor, focus } = getAF(ta);
-            setSelection(anchor, prevStop(units, focus));
-          } else {
-            const t = s !== en ? s : prevStop(units, s);
-            setSelection(t, t);
-          }
+          if (extend) moveTo(prevStop(units, focus), true);
+          else moveTo(s !== en ? s : prevStop(units, s), false);
           return;
         }
-        case 'ArrowRight': {
+        case "ArrowRight": {
           e.preventDefault();
-          if (extend) {
-            const { anchor, focus } = getAF(ta);
-            setSelection(anchor, nextStop(units, focus, len));
-          } else {
-            const t = s !== en ? en : nextStop(units, s, len);
-            setSelection(t, t);
-          }
+          if (extend) moveTo(nextStop(units, focus, len), true);
+          else moveTo(s !== en ? en : nextStop(units, s, len), false);
           return;
         }
-        case 'ArrowUp':
+        case "ArrowUp":
           e.preventDefault();
           moveVertical(-1, extend);
           return;
-        case 'ArrowDown':
+        case "ArrowDown":
           e.preventDefault();
           moveVertical(1, extend);
           return;
-        case 'Home':
+        case "Home":
           e.preventDefault();
-          goRowEdge('start', extend);
+          goRowEdge("start", extend);
           return;
-        case 'End':
+        case "End":
           e.preventDefault();
-          goRowEdge('end', extend);
+          goRowEdge("end", extend);
           return;
-        case 'Backspace': {
+        case "Backspace": {
           e.preventDefault();
           if (s !== en) {
             commit(text.slice(0, s) + text.slice(en), s, s);
@@ -295,7 +297,7 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
           commit(text.slice(0, from) + text.slice(s), from, from);
           return;
         }
-        case 'Delete': {
+        case "Delete": {
           e.preventDefault();
           if (s !== en) {
             commit(text.slice(0, s) + text.slice(en), s, s);
@@ -310,50 +312,93 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
           return;
       }
     },
-    [commit, goRowEdge, moveVertical, redo, setSelection, undo, units],
+    [
+      commit,
+      goRowEdge,
+      moveTo,
+      moveVertical,
+      redo,
+      setSelection,
+      undo,
+      units,
+      writeNative,
+    ],
+  );
+
+  const commitTyped = useCallback(
+    (ta: HTMLTextAreaElement) => {
+      const text = textRef.current;
+      const { anchor, focus } = selRef.current;
+      const start = Math.min(anchor, focus);
+      const end = Math.max(anchor, focus);
+      const tail = text.slice(end);
+      const value = ta.value;
+
+      let next: string;
+      let caret: number;
+      if (value.endsWith(tail)) {
+        const typed = value.slice(0, value.length - tail.length);
+        next = text.slice(0, start) + typed + tail;
+        caret = start + typed.length;
+      } else if (tail.endsWith(value)) {
+        next = text.slice(0, end) + value;
+        caret = start;
+      } else {
+        writeNative(text, selRef.current);
+        return;
+      }
+
+      if (next === text) {
+        writeNative(text, selRef.current);
+        return;
+      }
+      pushHistory(true);
+      apply(next, caret, caret);
+    },
+    [apply, pushHistory, writeNative],
   );
 
   const handleInput = useCallback(
     (e: FormEvent<HTMLTextAreaElement>) => {
-      const ta = e.currentTarget;
-      if (composingRef.current) return;
-      if (skipNextInputRef.current) {
-        skipNextInputRef.current = false;
-        if (ta.value === textRef.current) return;
-        setRawText(ta.value);
-        setSelectionState({ anchor: ta.selectionStart, focus: ta.selectionEnd });
-        return;
-      }
-      pushHistory(true);
-      setRawText(ta.value);
-      setSelectionState({ anchor: ta.selectionStart, focus: ta.selectionEnd });
+      if (!composingRef.current) commitTyped(e.currentTarget);
     },
-    [pushHistory],
+    [commitTyped],
   );
 
-  const handleSelect = useCallback(() => {
-    const ta = textareaRef.current;
-    if (!ta || composingRef.current) return;
-    setSelectionState(getAF(ta));
-  }, []);
+  const copySelection = useCallback(
+    (e: ClipboardEvent<HTMLTextAreaElement>, cut: boolean) => {
+      const { anchor, focus } = selRef.current;
+      const start = Math.min(anchor, focus);
+      const end = Math.max(anchor, focus);
+      if (start === end) return;
+      const text = textRef.current;
+      e.preventDefault();
+      e.clipboardData.setData("text/plain", text.slice(start, end));
+      if (cut) commit(text.slice(0, start) + text.slice(end), start, start);
+    },
+    [commit],
+  );
 
   const handleCompositionStart = useCallback(() => {
     composingRef.current = true;
     pushHistory(false);
   }, [pushHistory]);
 
-  const handleCompositionUpdate = useCallback((e: CompositionEvent<HTMLTextAreaElement>) => {
-    setComposing(e.data ?? '');
-  }, []);
+  const handleCompositionUpdate = useCallback(
+    (e: CompositionEvent<HTMLTextAreaElement>) => {
+      setComposing(e.data ?? "");
+    },
+    [],
+  );
 
-  const handleCompositionEnd = useCallback((e: CompositionEvent<HTMLTextAreaElement>) => {
-    composingRef.current = false;
-    skipNextInputRef.current = true;
-    setComposing('');
-    const ta = e.currentTarget;
-    setRawText(ta.value);
-    setSelectionState({ anchor: ta.selectionStart, focus: ta.selectionEnd });
-  }, []);
+  const handleCompositionEnd = useCallback(
+    (e: CompositionEvent<HTMLTextAreaElement>) => {
+      composingRef.current = false;
+      setComposing("");
+      commitTyped(e.currentTarget);
+    },
+    [commitTyped],
+  );
 
   const selStart = Math.min(selection.anchor, selection.focus);
   const selEnd = Math.max(selection.anchor, selection.focus);
@@ -365,6 +410,7 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
     sheet,
     units,
     caret,
+    composingCaret,
     selStart,
     selEnd,
     composing,
@@ -374,13 +420,15 @@ export function useSheetEditor(initialText: string, initialConfig: StyleConfig) 
     textareaRef,
     loadText,
     setSelection,
-    pickOffset,
+    pickOffset: moveTo,
     undo,
     redo,
     handlers: {
       onInput: handleInput,
       onKeyDown: handleKeyDown,
-      onSelect: handleSelect,
+      onCopy: (e: ClipboardEvent<HTMLTextAreaElement>) =>
+        copySelection(e, false),
+      onCut: (e: ClipboardEvent<HTMLTextAreaElement>) => copySelection(e, true),
       onCompositionStart: handleCompositionStart,
       onCompositionUpdate: handleCompositionUpdate,
       onCompositionEnd: handleCompositionEnd,

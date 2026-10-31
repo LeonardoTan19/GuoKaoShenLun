@@ -1,9 +1,15 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
-import { cellSelected } from '../core/sourcemap';
-import { resolveFontStack, resolveTargetWords } from '../core/presets';
-import type { MappedCell } from '../core/types';
-import type { SheetEditor } from '../hooks/useSheetEditor';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
+import { cellSelected } from "../core/sourcemap";
+import { resolveFontStack, resolveTargetWords } from "../core/presets";
+import type { MappedCell } from "../core/types";
+import type { SheetEditor } from "../hooks/useSheetEditor";
 
 /** 挤格文字的横向压缩比下限；再扁就改缩字号，保住可读高度 */
 const MIN_SCALE_X = 0.72;
@@ -14,7 +20,7 @@ const FIT_RATIO = 0.9;
 /** 行尾避头标点最多占格宽的比例 */
 const EXTRA_PUNCT_FIT_RATIO = 0.35;
 /** 卷面标线与字数标记的颜色 */
-const MARKER_COLOR = '#f43f5e';
+const MARKER_COLOR = "#f43f5e";
 /** 每多少字打一个刻度 */
 const MARK_INTERVAL = 100;
 /** 100% 缩放（zoom = 1）时的格子边长 */
@@ -23,13 +29,15 @@ const CELL_SIZE_100 = 33.6;
 const SHEET_SIDE_EXTRA_PX = 32 * 2 + 1;
 /** A4 纵向纸张在 96dpi 下扣除左右各 10mm 页边距后的可打印宽度（与 index.css 的 @page 一致） */
 const PRINT_CONTENT_WIDTH_PX = Math.floor(((210 - 20) / 25.4) * 96);
+/** 量字体内容盒高比时使用的字号，越大舍入误差越小 */
+const FONT_BOX_PROBE_PX = 100;
 
 /** 离屏 canvas，仅用于量文字自然宽度 */
 let measureCtx: CanvasRenderingContext2D | null | undefined;
 
 function getMeasureCtx(): CanvasRenderingContext2D | null {
   if (measureCtx === undefined) {
-    measureCtx = document.createElement('canvas').getContext('2d');
+    measureCtx = document.createElement("canvas").getContext("2d");
   }
   return measureCtx;
 }
@@ -40,8 +48,12 @@ interface Props {
 }
 
 /** 挤格文字的样式：只动横向 scaleX，挤不下时才由字号补差 */
-function fitStyle(fit: { fontSize: number; scaleX: number } | null): CSSProperties | null {
-  return fit ? { fontSize: fit.fontSize, transform: `scaleX(${fit.scaleX.toFixed(3)})` } : null;
+function fitStyle(
+  fit: { fontSize: number; scaleX: number } | null,
+): CSSProperties | null {
+  return fit
+    ? { fontSize: fit.fontSize, transform: `scaleX(${fit.scaleX.toFixed(3)})` }
+    : null;
 }
 
 /** 字数刻度：格下方居中、尖朝上的小三角 */
@@ -54,9 +66,9 @@ function triangleStyle(
   const w = Math.round(cellSize * 0.1 * (big ? 1.5 : 1));
   const h = Math.round(cellSize * 0.16 * (big ? 1.5 : 1));
   return {
-    position: 'absolute',
-    top: '100%',
-    left: '50%',
+    position: "absolute",
+    top: "100%",
+    left: "50%",
     marginLeft: -w,
     marginTop: Math.round((rowGap - h) / 2),
     width: 0,
@@ -76,21 +88,31 @@ function markLabelStyle(
 ): CSSProperties {
   const w = Math.round(cellSize * 0.1 * (big ? 1.5 : 1));
   return {
-    position: 'absolute',
-    top: '100%',
-    left: '50%',
+    position: "absolute",
+    top: "100%",
+    left: "50%",
     marginLeft: w + 2,
     marginTop: Math.round(rowGap / 2),
-    transform: 'translateY(-50%)',
+    transform: "translateY(-50%)",
     fontSize: Math.max(8, Math.round(rowGap * 0.7)),
     lineHeight: 1,
     color,
-    whiteSpace: 'nowrap',
+    whiteSpace: "nowrap",
   };
 }
 
 export function AnswerSheet({ editor, zoom }: Props) {
-  const { sheet, caret, selStart, selEnd, composing, focused, config } = editor;
+  const {
+    sheet,
+    caret,
+    composingCaret,
+    selStart,
+    selEnd,
+    composing,
+    focused,
+    config,
+  } = editor;
+  const visualCaret = composingCaret ?? caret;
   const cols = sheet.cols;
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -102,7 +124,10 @@ export function AnswerSheet({ editor, zoom }: Props) {
   const fontSerial = Math.round(cellSize * 0.64);
   const fontDouble = Math.round(cellSize * 0.7);
   const rowGap = Math.round(cellSize * 0.4);
-  const lineColor = config.showGrid ? MARKER_COLOR : 'transparent';
+  const caretInsetY = Math.round(cellSize * 0.14);
+  const caretHeight = cellSize - caretInsetY * 2;
+  const [fontBoxRatio, setFontBoxRatio] = useState(1.2);
+  const lineColor = config.showGrid ? MARKER_COLOR : "transparent";
   const fontStack = resolveFontStack(config.font);
 
   const measureCache = useRef(new Map<string, number>());
@@ -136,9 +161,27 @@ export function AnswerSheet({ editor, zoom }: Props) {
   /** 卷面比纸张宽时，打印前按比例缩小，避免预览被裁切 */
   useEffect(() => {
     const sheetWidth = cols * cellSize + SHEET_SIDE_EXTRA_PX;
-    const scale = sheetWidth > PRINT_CONTENT_WIDTH_PX ? PRINT_CONTENT_WIDTH_PX / sheetWidth : 1;
-    document.documentElement.style.setProperty('--print-sheet-scale', scale.toFixed(4));
+    const scale =
+      sheetWidth > PRINT_CONTENT_WIDTH_PX
+        ? PRINT_CONTENT_WIDTH_PX / sheetWidth
+        : 1;
+    document.documentElement.style.setProperty(
+      "--print-sheet-scale",
+      scale.toFixed(4),
+    );
   }, [cols, cellSize]);
+
+  /** 量字体的内容盒高比（ascent + descent / 字号），供隐形输入框对齐格内字高 */
+  useEffect(() => {
+    const ctx = getMeasureCtx();
+    if (!ctx) return;
+    ctx.font = `${FONT_BOX_PROBE_PX}px ${fontStack}`;
+    const m = ctx.measureText("国");
+    const ascent = m.fontBoundingBoxAscent ?? 0;
+    const descent = m.fontBoundingBoxDescent ?? 0;
+    const ratio = (ascent + descent) / FONT_BOX_PROBE_PX;
+    if (ratio > 0.5) setFontBoxRatio(ratio);
+  }, [fontStack, fontEpoch]);
 
   /** 量出 text 在给定字号下的自然宽度（带缓存） */
   const measureWidth = (text: string, fontPx: number): number => {
@@ -183,30 +226,47 @@ export function AnswerSheet({ editor, zoom }: Props) {
     const ta = editor.textareaRef.current;
     const wrap = wrapRef.current;
     if (!ta || !wrap) return;
-    const el = wrap.querySelector<HTMLElement>(`[data-cell="${caret.cellId}"]`);
+    const el = wrap.querySelector<HTMLElement>(
+      `[data-cell="${visualCaret.cellId}"]`,
+    );
     if (!el) return;
 
     const wr = wrap.getBoundingClientRect();
     const cr = el.getBoundingClientRect();
-    ta.style.top = `${cr.top - wr.top}px`;
-    ta.style.left = `${cr.left - wr.left + (caret.placement === 'right' ? cr.width - 2 : 0)}px`;
-    ta.style.height = `${cr.height}px`;
+    const caretLeft =
+      visualCaret.placement === "right" ? cr.right - 4 : cr.left + 1;
+    ta.style.top = `${cr.top - wr.top + caretInsetY}px`;
+    ta.style.left = `${caretLeft - wr.left}px`;
+    ta.style.height = `${caretHeight}px`;
 
     const scroller = scrollRef.current;
     if (scroller) {
       const sr = scroller.getBoundingClientRect();
       if (cr.top < sr.top) scroller.scrollTop -= sr.top - cr.top + cellSize;
-      else if (cr.bottom > sr.bottom) scroller.scrollTop += cr.bottom - sr.bottom + cellSize;
-      if (cr.left < sr.left) scroller.scrollLeft -= sr.left - cr.left + cellSize;
-      else if (cr.right > sr.right) scroller.scrollLeft += cr.right - sr.right + cellSize;
+      else if (cr.bottom > sr.bottom)
+        scroller.scrollTop += cr.bottom - sr.bottom + cellSize;
+      if (cr.left < sr.left)
+        scroller.scrollLeft -= sr.left - cr.left + cellSize;
+      else if (cr.right > sr.right)
+        scroller.scrollLeft += cr.right - sr.right + cellSize;
     }
-  }, [caret, editor.textareaRef, cellSize, sheet]);
+  }, [
+    visualCaret,
+    editor.textareaRef,
+    cellSize,
+    caretInsetY,
+    caretHeight,
+    sheet,
+  ]);
 
-  const offsetFromEvent = useCallback((e: ReactMouseEvent<HTMLElement>, cell: MappedCell) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const rightHalf = e.clientX - rect.left > rect.width / 2;
-    return rightHalf ? cell.rawEnd : cell.rawStart;
-  }, []);
+  const offsetFromEvent = useCallback(
+    (e: ReactMouseEvent<HTMLElement>, cell: MappedCell) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const rightHalf = e.clientX - rect.left > rect.width / 2;
+      return rightHalf ? cell.rawEnd : cell.rawStart;
+    },
+    [],
+  );
 
   const handleCellMouseDown = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>, cell: MappedCell) => {
@@ -228,8 +288,11 @@ export function AnswerSheet({ editor, zoom }: Props) {
     (e: ReactMouseEvent<HTMLDivElement>, cell: MappedCell) => {
       e.preventDefault();
       const offset = offsetFromEvent(e, cell);
-      const unit = editor.units.find((u) => u.start <= offset && offset < u.end);
-      if (unit && unit.end > unit.start) editor.setSelection(unit.start, unit.end);
+      const unit = editor.units.find(
+        (u) => u.start <= offset && offset < u.end,
+      );
+      if (unit && unit.end > unit.start)
+        editor.setSelection(unit.start, unit.end);
     },
     [editor, offsetFromEvent],
   );
@@ -239,7 +302,7 @@ export function AnswerSheet({ editor, zoom }: Props) {
       const anchor = draggingRef.current;
       if (anchor === null) return;
       const el = document.elementFromPoint(e.clientX, e.clientY);
-      const cellEl = el?.closest<HTMLElement>('[data-raw-start]');
+      const cellEl = el?.closest<HTMLElement>("[data-raw-start]");
       if (!cellEl) return;
       const rawStart = Number(cellEl.dataset.rawStart);
       const rawEnd = Number(cellEl.dataset.rawEnd);
@@ -251,28 +314,29 @@ export function AnswerSheet({ editor, zoom }: Props) {
     const onUp = () => {
       draggingRef.current = null;
     };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
     return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
     };
   }, [editor.setSelection]);
 
   // 字数刻度所在格（从 1 数起）：每 100 字一个，加上「字数要求」那一格
   const targetWords = resolveTargetWords(config.targetWords);
   const marks = new Set<number>();
-  for (let n = MARK_INTERVAL; n <= cols * sheet.grid.length; n += MARK_INTERVAL) marks.add(n);
+  for (let n = MARK_INTERVAL; n <= cols * sheet.grid.length; n += MARK_INTERVAL)
+    marks.add(n);
   marks.add(targetWords);
 
   return (
     <div
       ref={scrollRef}
       className={[
-        'thin-scroll h-full select-none overflow-auto bg-stone-200/70 p-5',
-        'print:h-auto print:overflow-visible print:bg-white print:p-0',
-        config.immersive ? 'pt-12 print:pt-0' : '',
-      ].join(' ')}
+        "thin-scroll h-full select-none overflow-auto bg-stone-200/70 p-5",
+        "print:h-auto print:overflow-visible print:bg-white print:p-0",
+        config.immersive ? "pt-12 print:pt-0" : "",
+      ].join(" ")}
     >
       <div
         ref={wrapRef}
@@ -282,7 +346,7 @@ export function AnswerSheet({ editor, zoom }: Props) {
       >
         <textarea
           ref={editor.textareaRef}
-          defaultValue={editor.rawText}
+          defaultValue=""
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"
@@ -292,12 +356,13 @@ export function AnswerSheet({ editor, zoom }: Props) {
             top: 0,
             left: 0,
             width: 2,
-            height: cellSize,
+            height: caretHeight,
             opacity: 0,
-            pointerEvents: 'none',
-            caretColor: 'transparent',
-            fontSize: fontMain,
-            lineHeight: 1,
+            pointerEvents: "none",
+            caretColor: "transparent",
+            fontSize: Math.round((caretHeight / fontBoxRatio) * 10) / 10,
+            lineHeight: `${caretHeight}px`,
+            whiteSpace: "pre",
           }}
           {...editor.handlers}
         />
@@ -324,19 +389,21 @@ export function AnswerSheet({ editor, zoom }: Props) {
                 const isTarget = index === targetWords;
                 const mark = marks.has(index);
                 const isCentury = index % MARK_INTERVAL === 0;
-                const isCaret = caret.row === rIdx && caret.col === cIdx;
+                const isCaret =
+                  visualCaret.row === rIdx && visualCaret.col === cIdx;
                 const selected = cellSelected(cell, selStart, selEnd);
-                const isSqueezed = cell.type === 'serial' || cell.type === 'punct-pair';
-                const isDouble = cell.type === 'double-char';
-                const isWide = cell.type === 'wide';
+                const isSqueezed =
+                  cell.type === "serial" || cell.type === "punct-pair";
+                const isDouble = cell.type === "double-char";
+                const isWide = cell.type === "wide";
                 const showExtra = Boolean(cell.extraPunct);
 
                 const caretStyle: CSSProperties = {
                   width: 2,
-                  top: Math.round(cellSize * 0.14),
-                  bottom: Math.round(cellSize * 0.14),
+                  top: caretInsetY,
+                  bottom: caretInsetY,
                 };
-                if (caret.placement === 'right') caretStyle.right = 1;
+                if (visualCaret.placement === "right") caretStyle.right = 1;
                 else caretStyle.left = 1;
 
                 const maxFitWidth = cellSize * FIT_RATIO;
@@ -349,9 +416,15 @@ export function AnswerSheet({ editor, zoom }: Props) {
                 const fitted = fitStyle(squeezeFit ?? doubleFit);
 
                 const extraBudget = cellSize * EXTRA_PUNCT_FIT_RATIO;
-                const extraNatural = showExtra ? measureWidth(cell.extraPunct ?? '', fontMain) : 0;
-                const extraScale = extraNatural > 0 ? Math.min(1, extraBudget / extraNatural) : 1;
-                const extraWidth = Math.round(extraNatural * extraScale * 100) / 100;
+                const extraNatural = showExtra
+                  ? measureWidth(cell.extraPunct ?? "", fontMain)
+                  : 0;
+                const extraScale =
+                  extraNatural > 0
+                    ? Math.min(1, extraBudget / extraNatural)
+                    : 1;
+                const extraWidth =
+                  Math.round(extraNatural * extraScale * 100) / 100;
 
                 return (
                   <div
@@ -362,18 +435,22 @@ export function AnswerSheet({ editor, zoom }: Props) {
                     onMouseDown={(e) => handleCellMouseDown(e, cell)}
                     onDoubleClick={(e) => handleCellDoubleClick(e, cell)}
                     className={[
-                      'relative flex cursor-text items-center justify-center transition-colors',
-                      selected ? 'bg-sky-200/70' : 'hover:bg-rose-50',
-                      isCaret && composing ? 'ring-1 ring-amber-400 ring-inset' : '',
-                    ].join(' ')}
+                      "relative flex cursor-text items-center justify-center transition-colors",
+                      selected ? "bg-sky-200/70" : "hover:bg-rose-50",
+                      isCaret && composing
+                        ? "ring-1 ring-amber-400 ring-inset"
+                        : "",
+                    ].join(" ")}
                     style={cellBox}
                   >
                     {cell.text && (
                       <span
                         className="whitespace-nowrap text-stone-900"
                         style={
-                          fitted ??
-                          { fontSize: fontMain, ...(isWide ? { transform: 'scaleX(1.05)' } : {}) }
+                          fitted ?? {
+                            fontSize: fontMain,
+                            ...(isWide ? { transform: "scaleX(1.05)" } : {}),
+                          }
                         }
                       >
                         {cell.text}
@@ -384,11 +461,11 @@ export function AnswerSheet({ editor, zoom }: Props) {
                       <span
                         className="pointer-events-none whitespace-nowrap text-stone-700"
                         style={{
-                          display: 'inline-block',
+                          display: "inline-block",
                           fontSize: fontMain,
                           width: extraWidth,
                           transform: `scaleX(${extraScale.toFixed(3)})`,
-                          transformOrigin: 'left center',
+                          transformOrigin: "left center",
                         }}
                       >
                         {cell.extraPunct}
@@ -398,7 +475,7 @@ export function AnswerSheet({ editor, zoom }: Props) {
                     {isCaret && (
                       <span
                         className={`caret-blink pointer-events-none absolute bg-blue-600 print:hidden ${
-                          focused ? '' : 'caret-idle'
+                          focused ? "" : "caret-idle"
                         }`}
                         style={caretStyle}
                       />
@@ -417,12 +494,22 @@ export function AnswerSheet({ editor, zoom }: Props) {
                       <>
                         <span
                           className="pointer-events-none"
-                          style={triangleStyle(cellSize, rowGap, isTarget, lineColor)}
+                          style={triangleStyle(
+                            cellSize,
+                            rowGap,
+                            isTarget,
+                            lineColor,
+                          )}
                         />
                         {isCentury && (
                           <span
                             className="font-hei pointer-events-none"
-                            style={markLabelStyle(cellSize, rowGap, isTarget, lineColor)}
+                            style={markLabelStyle(
+                              cellSize,
+                              rowGap,
+                              isTarget,
+                              lineColor,
+                            )}
                           >
                             {index}字
                           </span>

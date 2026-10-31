@@ -1,29 +1,63 @@
-import { useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { LayoutGrid, Monitor, Ruler, Settings as SettingsIcon, Type, X } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import { FONT_OPTIONS, resolveColsPerRow, resolveTargetWords } from '../core/presets';
-import type { FontKey, StyleConfig } from '../core/types';
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
+import {
+  LayoutGrid,
+  Monitor,
+  Ruler,
+  Settings as SettingsIcon,
+  Type,
+  X,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  FONT_OPTIONS,
+  resolveColsPerRow,
+  resolveTargetWords,
+} from "../core/presets";
+import type { FontKey, StyleConfig } from "../core/types";
 
 const toCount = (value: string) => Math.max(0, Math.floor(Number(value) || 0));
 
 const INPUT =
-  'h-5 w-16 rounded border border-stone-300 px-1.5 text-xs placeholder:text-stone-300 focus:border-rose-400 focus:outline-none';
+  "h-5 w-16 rounded border border-stone-300 px-1.5 text-xs placeholder:text-stone-300 focus:border-rose-400 focus:outline-none";
 
 const ROW =
-  'flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-xs leading-5 text-stone-700 hover:bg-stone-100';
+  "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-xs leading-5 text-stone-700 hover:bg-stone-100";
 
-type FlagKey = Exclude<keyof StyleConfig, 'colsPerRow' | 'targetWords' | 'font' | 'immersive'>;
+type FlagKey = Exclude<
+  keyof StyleConfig,
+  "colsPerRow" | "targetWords" | "font" | "immersive"
+>;
 
 /** 排版规则开关（与 StyleConfig 的布尔字段一一对应） */
 const FLAGS: { key: FlagKey; label: string; title?: string }[] = [
-  { key: 'indentTwoCells', label: '首行缩进' },
-  { key: 'mergeSerialNumber', label: '编号合并', title: '1、2. （3） 等序号整体占一格' },
-  { key: 'mergePunctPair', label: '标点合并', title: '：“ 。” ！” ？” 等相邻双标点合占一格' },
-  { key: 'mergeDoubleDigits', label: '数字合并', title: '如 2026 占两格（20 / 26）' },
-  { key: 'avoidLineStartPunct', label: '标点避头', title: '行首禁排标点挤压到上一行最后一格' },
-  { key: 'keepWidePairs', label: '破折号占两格', title: '—— / …… 占两格且不拆行' },
-  { key: 'centerTitle', label: '第一行为标题', title: '首行作为标题自动居中' },
+  { key: "indentTwoCells", label: "首行缩进" },
+  {
+    key: "mergeSerialNumber",
+    label: "编号合并",
+    title: "1、2. （3） 等序号整体占一格",
+  },
+  {
+    key: "mergePunctPair",
+    label: "标点合并",
+    title: "：“ 。” ！” ？” 等相邻双标点合占一格",
+  },
+  {
+    key: "mergeDoubleDigits",
+    label: "数字合并",
+    title: "如 2026 占两格（20 / 26）",
+  },
+  {
+    key: "avoidLineStartPunct",
+    label: "标点避头",
+    title: "行首禁排标点挤压到上一行最后一格",
+  },
+  {
+    key: "keepWidePairs",
+    label: "破折号占两格",
+    title: "—— / …… 占两格且不拆行",
+  },
+  { key: "centerTitle", label: "第一行为标题", title: "首行作为标题自动居中" },
 ];
 
 function SectionTitle({
@@ -79,10 +113,10 @@ export function SettingsPanel({ open, config, onConfig, onClose }: Props) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === "Escape") onClose();
     };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
   if (!open) return null;
@@ -96,12 +130,19 @@ export function SettingsPanel({ open, config, onConfig, onClose }: Props) {
 
   return createPortal(
     <>
-      <div className="print:hidden fixed inset-0 z-40 bg-stone-900/20" onMouseDown={onClose} />
+      <div
+        className="print:hidden fixed inset-0 z-40 bg-stone-900/20"
+        onMouseDown={onClose}
+      />
 
       <aside className="settings-drawer print:hidden fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-stone-200 bg-white shadow-2xl">
         <div className="flex shrink-0 items-center justify-between border-b border-stone-200 px-4 py-3">
           <h2 className="flex items-center gap-1.5 text-sm font-semibold text-stone-800">
-            <SettingsIcon className="size-4" strokeWidth={1.75} aria-hidden="true" />
+            <SettingsIcon
+              className="size-4"
+              strokeWidth={1.75}
+              aria-hidden="true"
+            />
             设置
           </h2>
           <button
@@ -125,9 +166,14 @@ export function SettingsPanel({ open, config, onConfig, onClose }: Props) {
                   type="number"
                   min={10}
                   max={40}
-                  value={config.colsPerRow || ''}
+                  value={config.colsPerRow || ""}
                   placeholder="25"
-                  onChange={(e) => onConfig((c) => ({ ...c, colsPerRow: toCount(e.target.value) }))}
+                  onChange={(e) =>
+                    onConfig((c) => ({
+                      ...c,
+                      colsPerRow: toCount(e.target.value),
+                    }))
+                  }
                   className={INPUT}
                 />
                 <span className="text-stone-500">格</span>
@@ -140,9 +186,14 @@ export function SettingsPanel({ open, config, onConfig, onClose }: Props) {
                   min={0}
                   max={2000}
                   step={50}
-                  value={config.targetWords || ''}
+                  value={config.targetWords || ""}
                   placeholder="300"
-                  onChange={(e) => onConfig((c) => ({ ...c, targetWords: toCount(e.target.value) }))}
+                  onChange={(e) =>
+                    onConfig((c) => ({
+                      ...c,
+                      targetWords: toCount(e.target.value),
+                    }))
+                  }
                   className={INPUT}
                 />
                 <span className="text-stone-500">字</span>
@@ -185,23 +236,34 @@ export function SettingsPanel({ open, config, onConfig, onClose }: Props) {
                   <label
                     key={option.key}
                     className={[
-                      'flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-xs transition',
-                      checked ? 'bg-rose-50 text-rose-700' : 'text-stone-700 hover:bg-stone-100',
-                    ].join(' ')}
+                      "flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-xs transition",
+                      checked
+                        ? "bg-rose-50 text-rose-700"
+                        : "text-stone-700 hover:bg-stone-100",
+                    ].join(" ")}
                   >
                     <input
                       type="radio"
                       name="sheet-font"
                       checked={checked}
-                      onChange={() => onConfig((c) => ({ ...c, font: option.key }))}
+                      onChange={() =>
+                        onConfig((c) => ({ ...c, font: option.key }))
+                      }
                       className="size-3.5 accent-rose-600"
                     />
-                    <span className="text-base leading-none" style={{ fontFamily: option.stack }}>
+                    <span
+                      className="text-base leading-none"
+                      style={{ fontFamily: option.stack }}
+                    >
                       申论作答
                     </span>
                     <span className="ml-auto shrink-0">
                       {option.label}
-                      {option.hint && <span className="ml-1 text-stone-400">{option.hint}</span>}
+                      {option.hint && (
+                        <span className="ml-1 text-stone-400">
+                          {option.hint}
+                        </span>
+                      )}
                     </span>
                   </label>
                 );

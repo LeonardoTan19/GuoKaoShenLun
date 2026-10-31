@@ -1,5 +1,5 @@
-import { clamp, resolveColsPerRow, resolveTargetWords } from './presets';
-import type { CellType, MappedCell, StyleConfig } from './types';
+import { clamp, resolveColsPerRow, resolveTargetWords } from "./presets";
+import type { CellType, MappedCell, StyleConfig } from "./types";
 
 /** 序号挤格：1、 2. （3） 等；ASCII 句点后跟数字视为小数点，不算序号 */
 const SERIAL_RE = /^(\d{1,2}[、．]|\d{1,2}\.(?!\d)|[（(]\d{1,2}[）)])/;
@@ -14,9 +14,9 @@ const FORBIDDEN_LINE_START_RE = /^[，。、；：？！）〕】》」”’％
 
 /** 「源码多字符挤进一格」的合并规则，按优先级排列 */
 const MERGE_RULES: { flag: keyof StyleConfig; re: RegExp; type: CellType }[] = [
-  { flag: 'mergeSerialNumber', re: SERIAL_RE, type: 'serial' },
-  { flag: 'mergePunctPair', re: PUNCT_PAIR_RE, type: 'punct-pair' },
-  { flag: 'mergeDoubleDigits', re: DOUBLE_DIGIT_RE, type: 'double-char' },
+  { flag: "mergeSerialNumber", re: SERIAL_RE, type: "serial" },
+  { flag: "mergePunctPair", re: PUNCT_PAIR_RE, type: "punct-pair" },
+  { flag: "mergeDoubleDigits", re: DOUBLE_DIGIT_RE, type: "double-char" },
 ];
 
 /** 排版过程中的中间态格子（还没有行列坐标） */
@@ -44,12 +44,22 @@ function charLenAt(text: string, i: number): number {
 }
 
 /** 把一个段落切成 token，每个 token 恰好占 1 格 */
-function tokenize(text: string, base: number, config: StyleConfig, unitPrefix: string): Draft[] {
+function tokenize(
+  text: string,
+  base: number,
+  config: StyleConfig,
+  unitPrefix: string,
+): Draft[] {
   const out: Draft[] = [];
   let i = 0;
   let seq = 0;
   const emit = (match: RegExpMatchArray, type: CellType) => {
-    out.push({ text: match[0], type, rawStart: base + i, rawEnd: base + i + match[0].length });
+    out.push({
+      text: match[0],
+      type,
+      rawStart: base + i,
+      rawEnd: base + i + match[0].length,
+    });
     i += match[0].length;
   };
 
@@ -58,10 +68,16 @@ function tokenize(text: string, base: number, config: StyleConfig, unitPrefix: s
     const wide = config.keepWidePairs ? rest.match(WIDE_PAIR_RE) : null;
     if (wide && wide[0].length === 2) {
       const unitId = `${unitPrefix}-w${seq++}`;
-      out.push({ text: wide[0][0], type: 'wide', rawStart: base + i, rawEnd: base + i + 1, unitId });
+      out.push({
+        text: wide[0][0],
+        type: "wide",
+        rawStart: base + i,
+        rawEnd: base + i + 1,
+        unitId,
+      });
       out.push({
         text: wide[0][1],
-        type: 'wide',
+        type: "wide",
         rawStart: base + i + 1,
         rawEnd: base + i + 2,
         unitId,
@@ -79,7 +95,7 @@ function tokenize(text: string, base: number, config: StyleConfig, unitPrefix: s
     const len = charLenAt(text, i);
     out.push({
       text: text.slice(i, i + len),
-      type: 'normal',
+      type: "normal",
       rawStart: base + i,
       rawEnd: base + i + len,
     });
@@ -95,7 +111,12 @@ export function buildSheet(rawText: string, config: StyleConfig): Sheet {
   const draftRows: Draft[][] = [];
 
   let row: Draft[] = [];
-  const blank = (at: number, type: CellType): Draft => ({ text: '', type, rawStart: at, rawEnd: at });
+  const blank = (at: number, type: CellType): Draft => ({
+    text: "",
+    type,
+    rawStart: at,
+    rawEnd: at,
+  });
   /** 收掉当前行 */
   const endRow = () => {
     draftRows.push(row);
@@ -112,7 +133,7 @@ export function buildSheet(rawText: string, config: StyleConfig): Sheet {
     if (row.length >= cols) endRow();
   };
 
-  const lines = rawText.split('\n');
+  const lines = rawText.split("\n");
   let base = 0;
 
   lines.forEach((lineText, pIdx) => {
@@ -122,18 +143,19 @@ export function buildSheet(rawText: string, config: StyleConfig): Sheet {
 
     const tokens = tokenize(lineText, start, config, `p${pIdx}`);
     const occupied = tokens.length;
-    const isTitleLine = pIdx === 0 && config.centerTitle && lineText.trim().length > 0;
+    const isTitleLine =
+      pIdx === 0 && config.centerTitle && lineText.trim().length > 0;
 
     if (isTitleLine && occupied < cols) {
       const pad = Math.floor((cols - occupied) / 2);
       for (let k = 0; k < pad; k++) {
-        push(blank(start, 'indent'));
+        push(blank(start, "indent"));
       }
     } else if (config.indentTwoCells) {
       // 最多缩进到「本行还剩一格放字」，1~2 格的小卷面也不会把缩进格挤到下一行
       const indent = Math.min(2, Math.max(cols - 1, 0));
       for (let k = 0; k < indent; k++) {
-        push(blank(start, 'indent'));
+        push(blank(start, "indent"));
       }
     }
 
@@ -143,7 +165,7 @@ export function buildSheet(rawText: string, config: StyleConfig): Sheet {
         config.avoidLineStartPunct &&
         row.length === 0 &&
         draftRows.length > 0 &&
-        t.type !== 'wide' &&
+        t.type !== "wide" &&
         FORBIDDEN_LINE_START_RE.test(t.text)
       ) {
         const prevRow = draftRows[draftRows.length - 1];
@@ -155,17 +177,18 @@ export function buildSheet(rawText: string, config: StyleConfig): Sheet {
           }
         }
         if (lastReal) {
-          lastReal.extraPunct = (lastReal.extraPunct ?? '') + t.text;
+          lastReal.extraPunct = (lastReal.extraPunct ?? "") + t.text;
           lastReal.extraPunctRange = [t.rawStart, t.rawEnd];
           lastReal.rawEnd = Math.max(lastReal.rawEnd, t.rawEnd);
           continue;
         }
       }
 
-      if (t.type === 'wide') {
+      if (t.type === "wide") {
         if (!wideOpen) {
           wideOpen = true;
-          if (cols >= 2 && row.length >= cols - 1) push(blank(t.rawStart, 'filler'));
+          if (cols >= 2 && row.length >= cols - 1)
+            push(blank(t.rawStart, "filler"));
         } else {
           wideOpen = false;
         }
@@ -175,7 +198,7 @@ export function buildSheet(rawText: string, config: StyleConfig): Sheet {
     }
 
     if (row.length > 0 || tokens.length === 0) {
-      flush('para-empty', end);
+      flush("para-empty", end);
     }
   });
 
@@ -185,8 +208,8 @@ export function buildSheet(rawText: string, config: StyleConfig): Sheet {
   while (draftRows.length < minRows) {
     draftRows.push(
       Array.from({ length: cols }, (): Draft => ({
-        text: '',
-        type: 'sheet-empty',
+        text: "",
+        type: "sheet-empty",
         rawStart: totalLen,
         rawEnd: totalLen,
       })),
@@ -203,6 +226,7 @@ export function buildSheet(rawText: string, config: StyleConfig): Sheet {
 /** 该格是否落在 [s, e) 选区内 */
 export function cellSelected(cell: MappedCell, s: number, e: number): boolean {
   if (s === e) return false;
-  if (cell.rawEnd <= cell.rawStart) return cell.rawStart > s && cell.rawStart < e;
+  if (cell.rawEnd <= cell.rawStart)
+    return cell.rawStart > s && cell.rawStart < e;
   return cell.rawStart < e && cell.rawEnd > s;
 }

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import type { RefObject } from 'react';
+import { useEffect, useState } from "react";
+import type { RefObject } from "react";
 
 /** 鼠标距屏幕上下边缘多近时浮出信息栏（px） */
 const HOT_ZONE = 8;
@@ -29,7 +29,10 @@ export function useImmersiveBars(
       const headerHeight = headerRef.current?.offsetHeight ?? 0;
       const footerHeight = footerRef.current?.offsetHeight ?? 0;
       setTopVisible((open) => y <= HOT_ZONE || (open && y <= headerHeight));
-      setBottomVisible((open) => fromBottom <= HOT_ZONE || (open && fromBottom <= footerHeight));
+      setBottomVisible(
+        (open) =>
+          fromBottom <= HOT_ZONE || (open && fromBottom <= footerHeight),
+      );
     };
 
     const hideAll = () => {
@@ -37,13 +40,13 @@ export function useImmersiveBars(
       setBottomVisible(false);
     };
 
-    window.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseleave', hideAll);
-    window.addEventListener('blur', hideAll);
+    window.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseleave", hideAll);
+    window.addEventListener("blur", hideAll);
     return () => {
-      window.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseleave', hideAll);
-      window.removeEventListener('blur', hideAll);
+      window.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseleave", hideAll);
+      window.removeEventListener("blur", hideAll);
     };
   }, [enabled, footerRef, headerRef]);
 

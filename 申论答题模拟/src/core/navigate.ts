@@ -1,4 +1,4 @@
-import type { CaretVisualPos, CellType, MappedCell } from './types';
+import type { CaretVisualPos, CellType, MappedCell } from "./types";
 
 /** 最小不可分整体：方向键 / 退格按它移动、删除 */
 export interface Unit {
@@ -7,7 +7,7 @@ export interface Unit {
 }
 
 /** 可作为光标落点的零宽格类型 */
-export const GAP_TYPES = new Set<CellType>(['para-empty', 'sheet-empty']);
+export const GAP_TYPES = new Set<CellType>(["para-empty", "sheet-empty"]);
 
 /** 从全量格子中抽取排序去重后的原子单元表 */
 export function buildUnits(flat: MappedCell[]): Unit[] {
@@ -42,7 +42,8 @@ export function buildUnits(flat: MappedCell[]): Unit[] {
   units.sort((a, b) => a.start - b.start || a.end - b.end);
 
   return units.filter(
-    (u, i) => i === 0 || u.start !== units[i - 1].start || u.end !== units[i - 1].end,
+    (u, i) =>
+      i === 0 || u.start !== units[i - 1].start || u.end !== units[i - 1].end,
   );
 }
 
@@ -57,7 +58,11 @@ export function prevStop(units: Unit[], offset: number): number {
 }
 
 /** 光标右移一格，返回目标偏移量 */
-export function nextStop(units: Unit[], offset: number, textLength: number): number {
+export function nextStop(
+  units: Unit[],
+  offset: number,
+  textLength: number,
+): number {
   let fallback = textLength;
   for (const u of units) {
     if (u.start <= offset && offset < u.end) return u.end;
@@ -67,7 +72,10 @@ export function nextStop(units: Unit[], offset: number, textLength: number): num
 }
 
 /** 文本索引 → 光标渲染坐标 */
-export function findCaretVisualPosition(grid: MappedCell[][], offset: number): CaretVisualPos {
+export function findCaretVisualPosition(
+  grid: MappedCell[][],
+  offset: number,
+): CaretVisualPos {
   for (let r = 0; r < grid.length; r++) {
     const row = grid[r];
     let gapSeen = false;
@@ -76,12 +84,17 @@ export function findCaretVisualPosition(grid: MappedCell[][], offset: number): C
       const cell = row[c];
 
       if (cell.rawEnd > cell.rawStart) {
-        if (cell.rawStart === offset) return { row: r, col: c, placement: 'left', cellId: cell.id };
+        if (cell.rawStart === offset)
+          return { row: r, col: c, placement: "left", cellId: cell.id };
         if (offset > cell.rawStart && offset <= cell.rawEnd) {
-          return { row: r, col: c, placement: 'right', cellId: cell.id };
+          return { row: r, col: c, placement: "right", cellId: cell.id };
         }
-      } else if (GAP_TYPES.has(cell.type) && cell.rawStart === offset && !gapSeen) {
-        return { row: r, col: c, placement: 'left', cellId: cell.id };
+      } else if (
+        GAP_TYPES.has(cell.type) &&
+        cell.rawStart === offset &&
+        !gapSeen
+      ) {
+        return { row: r, col: c, placement: "left", cellId: cell.id };
       }
 
       if (GAP_TYPES.has(cell.type)) gapSeen = true;
@@ -89,7 +102,12 @@ export function findCaretVisualPosition(grid: MappedCell[][], offset: number): C
   }
 
   const first = grid[0]?.[0];
-  return { row: 0, col: 0, placement: 'left', cellId: first ? first.id : '0-0' };
+  return {
+    row: 0,
+    col: 0,
+    placement: "left",
+    cellId: first ? first.id : "0-0",
+  };
 }
 
 /** 某一行里真实内容的起止偏移量 */

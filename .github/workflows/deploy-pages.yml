@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - '申论答题模拟/**'
-      - '.github/workflows/deploy-pages.yml'
+      - "申论答题模拟/**"
+      - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: '申论答题模拟'
+        working-directory: "申论答题模拟"
     steps:
       - uses: actions/checkout@v7
 
@@ -36,7 +36,7 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: '申论答题模拟/dist'
+          path: "申论答题模拟/dist"
 
   deploy:
     needs: build

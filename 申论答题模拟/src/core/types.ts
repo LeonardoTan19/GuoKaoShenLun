@@ -3,26 +3,26 @@
 /** 单元格类型：决定点击落点、光标吸合位置与方向键导航行为 */
 export type CellType =
   /** 单个汉字 / 标点 */
-  | 'normal'
+  | "normal"
   /** 「1、」「2.」「（3）」挤在一格（源码 2~4 字符） */
-  | 'serial'
+  | "serial"
   /** 相邻双标点合占一格（源码 2 字符） */
-  | 'punct-pair'
+  | "punct-pair"
   /** 两位数字挤在一格（源码 2 字符） */
-  | 'double-char'
+  | "double-char"
   /** 破折号 / 省略号的其中一格（两格一组，原子不可分） */
-  | 'wide'
+  | "wide"
   /** 段首缩进、标题居中填充（零宽） */
-  | 'indent'
+  | "indent"
   /** 段末补齐（零宽） */
-  | 'para-empty'
+  | "para-empty"
   /** 为避免拆断宽单元留下的空位（零宽） */
-  | 'filler'
+  | "filler"
   /** 卷面底部纯空行（零宽） */
-  | 'sheet-empty';
+  | "sheet-empty";
 
 /** 卷面可选的作答字体 */
-export type FontKey = 'xingshu' | 'kaiti' | 'fangsong' | 'songti' | 'heiti';
+export type FontKey = "xingshu" | "kaiti" | "fangsong" | "songti" | "heiti";
 
 /** 排版风格开关 */
 export interface StyleConfig {
@@ -74,7 +74,7 @@ export interface MappedCell {
 }
 
 /** 光标画在某格的左边缘还是右边缘 */
-export type CaretPlacement = 'left' | 'right';
+export type CaretPlacement = "left" | "right";
 
 /** 光标的视觉位置（由字符偏移量反查得到） */
 export interface CaretVisualPos {

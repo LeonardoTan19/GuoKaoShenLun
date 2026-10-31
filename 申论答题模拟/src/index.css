@@ -1,9 +1,9 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 /* 随项目打包的硬笔行书字体（与硬笔楷书同一字符集） */
 @font-face {
-  font-family: 'Ruimei Xingshu';
-  src: url('./assets/fonts/ruimei-zhangqingping-xingshu.woff2') format('woff2');
+  font-family: "Ruimei Xingshu";
+  src: url("./assets/fonts/ruimei-zhangqingping-xingshu.woff2") format("woff2");
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -11,8 +11,8 @@
 
 /* 随项目打包的硬笔楷书字体 */
 @font-face {
-  font-family: 'Ruimei Kaishu';
-  src: url('./assets/fonts/ruimei-zhangqingping-kaishu.woff2') format('woff2');
+  font-family: "Ruimei Kaishu";
+  src: url("./assets/fonts/ruimei-zhangqingping-kaishu.woff2") format("woff2");
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -21,8 +21,8 @@
 @theme {
   /* 黑体：用于字数刻度等说明文字 */
   --font-hei:
-    'Heiti SC', 'STHeiti', 'SimHei', '黑体', 'Microsoft YaHei UI', 'Microsoft YaHei',
-    'PingFang SC', sans-serif;
+    'Heiti SC', 'STHeiti', 'SimHei', '黑体', 'Microsoft YaHei UI',
+    'Microsoft YaHei', 'PingFang SC', sans-serif;
 }
 
 html,
@@ -36,7 +36,12 @@ body {
   background: #f5f5f4;
   color: #1c1917;
   font-family:
-    'Microsoft YaHei UI', 'PingFang SC', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    "Microsoft YaHei UI",
+    "PingFang SC",
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 

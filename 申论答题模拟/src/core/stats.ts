@@ -1,4 +1,4 @@
-import type { MappedCell } from './types';
+import type { MappedCell } from "./types";
 
 /** 字数统计（申论口径：不含换行符，标点计入） */
 export interface SheetStats {
@@ -19,6 +19,6 @@ function lastOccupiedIndex(flat: MappedCell[]): number {
 export function countStats(flat: MappedCell[], text: string): SheetStats {
   return {
     cells: lastOccupiedIndex(flat) + 1,
-    chars: Array.from(text.replace(/\n/g, '')).length,
+    chars: Array.from(text.replace(/\n/g, "")).length,
   };
 }
